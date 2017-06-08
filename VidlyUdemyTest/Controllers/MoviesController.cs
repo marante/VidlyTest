@@ -1,7 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Data.Entity;
 using System.Linq;
-using System.Web;
 using System.Web.Mvc;
 using VidlyUdemyTest.Models;
 using VidlyUdemyTest.ViewModel;
@@ -11,26 +10,95 @@ namespace VidlyUdemyTest.Controllers
     public class MoviesController : Controller
     {
 
-        // GET: Movies/Index
-        public ActionResult Index()
+        private ApplicationDbContext _context;
+
+        public MoviesController()
+        {
+            _context = new ApplicationDbContext();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            _context.Dispose();
+        }
+
+        public ActionResult New()
+        {
+            var genres = _context.Genres.ToList();
+
+            var viewModel = new MovieFormViewModel()
+            {
+                Genre = genres
+            };
+            return View("MoviesForm", viewModel);
+        }
+
+        public ActionResult Edit(int id)
         {
 
-            var movies = new List<Movie>
+            var movie = _context.Movies.SingleOrDefault(m => m.Id == id);
+
+            if (movie == null)
+                return HttpNotFound();
+
+            var viewModel = new MovieFormViewModel(movie)
             {
-                new Movie { Id = 1, Name = "Terminator 3" },
-                new Movie { Id = 2, Name = "Shrek" },
-                new Movie { Id = 3, Name = "Top Gun" },
-                new Movie { Id = 4, Name = "Lord of the Rings" },
-                new Movie { Id = 5, Name = "Star Wars" }
+                Genre = _context.Genres.ToList()
             };
 
+
+            return View("MoviesForm", viewModel);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult Save(Movie movie)
+        {
+
+            if (!ModelState.IsValid)
+            {
+                var viewModel = new MovieFormViewModel(movie)
+                {
+                    Genre = _context.Genres.ToList()
+                };
+
+                return View("MoviesForm", viewModel);
+            }
+            if (movie.Id == 0)
+            {
+                movie.DateAdded = DateTime.Now;
+                _context.Movies.Add(movie);
+            }
+            else
+            {
+                var movieInDb = _context.Movies.SingleOrDefault(m => m.Id == movie.Id);
+
+                movieInDb.Name = movie.Name;
+                movieInDb.GenreId = movie.GenreId;
+                movieInDb.NumberInStock = movie.NumberInStock;
+                movieInDb.ReleaseDate = movie.ReleaseDate;
+            }
+
+            _context.SaveChanges();
+
+            return RedirectToAction("Index", "Movies");
+        }
+
+        // GET: Movies/Index
+        public ViewResult Index()
+        {
+            var movies = _context.Movies.Include(m => m.Genre).ToList();
             return View(movies);
         }
 
-        // GET: Movies/Details/{id}
         public ActionResult Details(int id)
         {
-            
+            var movies = _context.Movies.Include(m => m.Genre).SingleOrDefault(m => m.Id == id);
+
+            if (movies == null)
+                return HttpNotFound();
+
+            return View(movies);
         }
 
 
